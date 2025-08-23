@@ -1,14 +1,11 @@
 ﻿using HarmonyLib;
 using MelonLoader;
-using MelonLoader.Preferences;
 using NeonLite;
 using NeonLite.Modules;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Rendering;
 using URPA = UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset;
@@ -58,7 +55,6 @@ namespace UltraPotato.Modules
         internal static MelonPreferences_Entry<float> streamingMipmapsMemoryBudget;
         internal static MelonPreferences_Entry<bool> _amplifyOcclusion;
 
-
         static readonly List<MelonPreferences_Entry> settings = [];
 
         const string PRESET_DESC = """
@@ -76,7 +72,7 @@ namespace UltraPotato.Modules
         static void Setup()
         {
             active = SuperPotato.Settings.enabled.SetupForModule(Activate, (_, after) => after);
-            SetQuality();
+            //SetQuality();
 
             _activePreset = Settings.Add(SuperPotato.Settings.h, "", "preset", "Preset", PRESET_DESC.Trim(), Presets.Medium);
             _activePreset.OnEntryValueChanged.Subscribe((_, after) => SetPreset(after));
@@ -116,10 +112,8 @@ namespace UltraPotato.Modules
                 entry.OnEntryValueChangedUntyped.Subscribe(static (_, _) => SetToCustom());
                 settings.Add(entry);
             }
-            bool storage = active;
-            active = false;
-            SetPreset(_activePreset.Value);
-            active = storage;
+
+            SetPreset(_activePreset.Value, false);
         }
 
 
@@ -135,11 +129,16 @@ namespace UltraPotato.Modules
             active = activate;
 
             SetQuality();
-            SetQualityValues();
+            if (!activate)
+                GameDataManager.ApplyShadowPrefs();
+            else
+                SetQualityValues();
         }
 
         static void RegenPFPNoMips(ref Texture2D profilePicture)
         {
+            if (profilePicture == null)
+                return;
             Texture2D c = new(profilePicture.width, profilePicture.height, profilePicture.format, false);
             c.SetPixels32(profilePicture.GetPixels32());
             c.Apply();
@@ -200,15 +199,10 @@ namespace UltraPotato.Modules
             _activePreset.Value = Presets.Custom;
             SetQualityValues();
         }
-        static void SetPreset(Presets preset)
+        static void SetPreset(Presets preset, bool set = true)
         {
-            if (preset == Presets.Custom)
-            {
-                SetQualityValues();
-                return;
-            }
-
             settingPreset = true;
+
             switch (preset)
             {
                 case Presets.SlowReflects:
@@ -336,7 +330,8 @@ namespace UltraPotato.Modules
                     break;
             }
 
-            SetQualityValues();
+            if (set)
+                SetQualityValues();
             settingPreset = false;
         }
     }
