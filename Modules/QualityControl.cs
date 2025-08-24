@@ -23,7 +23,7 @@ namespace UltraPotato.Modules
             Low,
             Medium,
             High,
-            SlowReflects,
+            SnapshotReflects,
             Maximum,
             Custom
         }
@@ -39,6 +39,7 @@ namespace UltraPotato.Modules
         internal static MelonPreferences_Entry<int> particleRaycastBudget;
         internal static MelonPreferences_Entry<int> pixelLightCount;
         internal static MelonPreferences_Entry<bool> realtimeReflectionProbes;
+        internal static MelonPreferences_Entry<bool> _actuallyRealtime;
         internal static MelonPreferences_Entry<ReflectionProbeTimeSlicingMode> _reflectionUpdate;
         internal static MelonPreferences_Entry<float> _reflectionProbeMultiplier;
         internal static MelonPreferences_Entry<int> _reflectionProbeMax;
@@ -64,7 +65,7 @@ namespace UltraPotato.Modules
             Low: Loses more detail than Medium for slightly better performance, with a slightly lower memory budget.
             Medium: The default. Lowers on VRAM without really being all too noticable in motion.
             High: Matches how Neon White *normally* looks. Here to use as a base for customization.
-            SlowReflects: High, but with reflections that update every 9 frames.
+            SnapshotReflects: High, but with reflections made at level load.
             Maximum: Cranks up the display to as high as it would let me. No LODs, super high-quality realtime reflections.
             **ONLY USE THIS IF YOUR PC IS ABSURDLY BEEFY!!!!!**
             """;
@@ -85,10 +86,11 @@ namespace UltraPotato.Modules
             maxQueuedFrames = Settings.Add(SuperPotato.Settings.h, "", "maxQueuedFrames", "Max Queued Frames", "How many frames to queue to the GPU.", default(int), true);
             particleRaycastBudget = Settings.Add(SuperPotato.Settings.h, "", "particleRaycastBudget", "Particle Raycast Budget", "How many times particles can raycast per frame.", default(int), true);
             pixelLightCount = Settings.Add(SuperPotato.Settings.h, "", "pixelLightCount", "Pixel Light Count", "How many pixel lights are allowed.\nUsed in the title, Heaven's Edge, TTT, and maybe other spots.", default(int), true);
-            realtimeReflectionProbes = Settings.Add(SuperPotato.Settings.h, "", "realtimeReflectionProbes", "Realtime Reflection Probes", "Enabling this setting can cause lag!!\nMakes all reflection probes reflect in *realtime.*", default(bool), true);
-            _reflectionProbeMultiplier = Settings.Add(SuperPotato.Settings.h, "", "_reflectionProbeMultiplier", "Reflection Probe Multiplier", "When realtime reflection probes are on, how much to multiply each probe's resolution by.", default(float), true);
-            _reflectionProbeMax = Settings.Add(SuperPotato.Settings.h, "", "_reflectionProbeMax", "Reflection Probe Max", "The maxiumum realtime probe resolution.", default(int), true);
-            _reflectionUpdate = Settings.Add(SuperPotato.Settings.h, "", "_reflectionUpdate", "Reflection Time Slicing", "AllFacesAtOnce: update every 9 frames\nIndividualFaces: update each face of the reflection individually (14 frames)\nNoTimeSlicing: update *every* frame", default(ReflectionProbeTimeSlicingMode), true);
+            realtimeReflectionProbes = Settings.Add(SuperPotato.Settings.h, "", "realtimeReflectionProbes", "Advanced Reflection Probes", "Enabling this allows the reflections to reflect from runtime instead of using the baked textures.", default(bool), false);
+            _actuallyRealtime = Settings.Add(SuperPotato.Settings.h, "", "_actuallyRealtime", "Realtime Reflections", "Enabling this setting can cause lag!!\nWhen disabled, it'll just take a snapshot on level load.", default(bool), false);
+            _reflectionProbeMultiplier = Settings.Add(SuperPotato.Settings.h, "", "_reflectionProbeMultiplier", "Reflection Probe Multiplier", "When advanced reflection probes are on, how much to multiply each probe's resolution by.", default(float), false);
+            _reflectionProbeMax = Settings.Add(SuperPotato.Settings.h, "", "_reflectionProbeMax", "Reflection Probe Max", "The maxiumum advanced reflection probe resolution.", default(int), false);
+            _reflectionUpdate = Settings.Add(SuperPotato.Settings.h, "", "_reflectionUpdate", "Reflection Time Slicing", "AllFacesAtOnce: update every 9 frames\nIndividualFaces: update each face of the reflection individually (14 frames)\nNoTimeSlicing: update *every* frame", default(ReflectionProbeTimeSlicingMode), false);
             _simplerWater = Settings.Add(SuperPotato.Settings.h, "", "_simplerWater", "Simpler Water", "Makes the water only reflect the skybox.", default(bool), true);
             shadows = Settings.Add(SuperPotato.Settings.h, "", "shadows", "Shadows", "Only affects (some) realtime shadows.", default(ShadowQuality), true);
             shadowResolution = Settings.Add(SuperPotato.Settings.h, "", "shadowResolution", "Shadow Resolution", "Higher means sharper.", default(ShadowResolution), true);
@@ -205,9 +207,9 @@ namespace UltraPotato.Modules
 
             switch (preset)
             {
-                case Presets.SlowReflects:
-                    _reflectionProbeMultiplier.Value = 4;
-                    _reflectionUpdate.Value = ReflectionProbeTimeSlicingMode.AllFacesAtOnce;
+                case Presets.SnapshotReflects:
+                    _reflectionProbeMultiplier.Value = 8;
+                    _actuallyRealtime.Value = false;
                     _reflectionProbeMax.Value = 1024;
                     goto case Presets.High;
                 case Presets.High:
@@ -313,6 +315,7 @@ namespace UltraPotato.Modules
                     particleRaycastBudget.Value = 8192;
                     pixelLightCount.Value = 100;
                     realtimeReflectionProbes.Value = true;
+                    _actuallyRealtime.Value = true;
                     _reflectionProbeMultiplier.Value = 32;
                     _reflectionProbeMax.Value = 2048;
                     _reflectionUpdate.Value = ReflectionProbeTimeSlicingMode.NoTimeSlicing;

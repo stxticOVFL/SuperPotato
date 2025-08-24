@@ -19,7 +19,6 @@ namespace UltraPotato.Modules
             readonly ReflectionProbeRefreshMode refreshMode = probe.refreshMode;
             readonly ReflectionProbeTimeSlicingMode timeSlicingMode = probe.timeSlicingMode;
             readonly ReflectionProbeMode mode = probe.mode;
-            readonly bool renderDynamicObjects = probe.renderDynamicObjects;
 
             public ReflectionProbe probe = probe;
             public void Reset()
@@ -29,7 +28,6 @@ namespace UltraPotato.Modules
                 probe.resolution = resolution;
                 probe.refreshMode = refreshMode;
                 probe.timeSlicingMode = timeSlicingMode;
-                probe.renderDynamicObjects = renderDynamicObjects;
                 probe.mode = mode;
             }
         }
@@ -68,16 +66,16 @@ namespace UltraPotato.Modules
             probes.RemoveAll(x => !(bool)x.probe);
             foreach (var probe in UnityEngine.Object.FindObjectsOfType<ReflectionProbe>())
             {
-                if (probes.Any(x => x.probe == probe))
+                if (probes.Any(x => x.probe == probe))                        
                     continue;
                 probes.Add(new(probe));
                 probe.resolution = Math.Max((int)(probe.resolution * QualityControl._reflectionProbeMultiplier.Value), QualityControl._reflectionProbeMax.Value);
-                probe.refreshMode = ReflectionProbeRefreshMode.EveryFrame;
-                probe.timeSlicingMode = QualityControl._reflectionUpdate.Value;
+                probe.refreshMode = QualityControl._actuallyRealtime.Value ? ReflectionProbeRefreshMode.EveryFrame : ReflectionProbeRefreshMode.ViaScripting;
+                probe.timeSlicingMode = QualityControl._actuallyRealtime.Value ? QualityControl._reflectionUpdate.Value : ReflectionProbeTimeSlicingMode.NoTimeSlicing;
                 probe.mode = ReflectionProbeMode.Realtime;
-                probe.renderDynamicObjects = true;
+                if (!QualityControl._actuallyRealtime.Value)
+                    probe.RenderProbe();
             }
-
         }
 
     }
