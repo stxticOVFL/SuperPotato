@@ -1,0 +1,29 @@
+ManifestFileVersion: 0
+CRC: 3357869981
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: 047de7c7cc3e0c165f509565b5ad354a
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: dd26dad737424347f96765a12e2828d9
+HashAppended: 0
+ClassTypes:
+- Class: 1
+  Script: {instanceID: 0}
+- Class: 4
+  Script: {instanceID: 0}
+- Class: 20
+  Script: {instanceID: 0}
+- Class: 72
+  Script: {instanceID: 0}
+- Class: 114
+  Script: {fileID: 11500000, guid: a79441f348de89743a2939f4d699eac1, type: 3}
+- Class: 115
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- Assets/Prefabs/holder.prefab
+- Assets/Shaders/RobustContrastAdaptiveSharpen.compute
+- Assets/Shaders/EdgeAdaptiveSpatialUpsampling.compute
+Dependencies: []

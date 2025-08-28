@@ -34,13 +34,18 @@ namespace UltraPotato.Modules
 
         static readonly List<ReflectionProbeData> probes = [];
 
-        static void Setup()
+        internal static void _Setup()
         {
-            active = QualityControl.realtimeReflectionProbes.SetupForModule(Activate, (_, after) => after);
+            active = QualityControl.realtimeReflectionProbes.SetupForModule(Activate, (_, _) => CheckActive());
+            SuperPotato.Settings.enabled.SetupForModule(Activate, (_, _) => CheckActive());
+
             QualityControl._reflectionProbeMultiplier.OnEntryValueChanged.Subscribe((_, _) => ResetProbes(true));
             QualityControl._reflectionUpdate.OnEntryValueChanged.Subscribe((_, _) => ResetProbes(true));
             QualityControl._reflectionProbeMax.OnEntryValueChanged.Subscribe((_, _) => ResetProbes(true));
         }
+
+        static bool lastActive;
+        internal static bool CheckActive() => QualityControl.active && QualityControl.realtimeReflectionProbes.Value;
 
         static void ResetProbes(bool oll)
         {
@@ -54,6 +59,10 @@ namespace UltraPotato.Modules
 
         static void Activate(bool activate)
         {
+            if (lastActive == activate)
+                return;
+            lastActive = activate;
+
             ResetProbes(activate);
             active = activate;
         }

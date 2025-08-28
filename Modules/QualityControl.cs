@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using MelonLoader;
+using MelonLoader.Preferences;
 using NeonLite;
 using NeonLite.Modules;
 using System;
@@ -9,13 +10,16 @@ using System.Reflection;
 using UnityEngine;
 using UnityEngine.Rendering;
 using URPA = UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset;
+using SRD = UnityEngine.Rendering.Universal.ScriptableRendererData;
 
 namespace UltraPotato.Modules
 {
-    internal class QualityControl : IModule
+    internal class QualityControl : MonoBehaviour, IModule
     {
+        static QualityControl i;
+
         const bool priority = false;
-        static bool active = true;
+        internal static bool active = true;
 
         internal enum Presets
         {
@@ -28,14 +32,15 @@ namespace UltraPotato.Modules
             Custom
         }
 
+        internal static Camera playerCam;
+
         internal static MelonPreferences_Entry<Presets> _activePreset;
-        //internal static MelonPreferences_Entry<float> _renderScale;
+        internal static MelonPreferences_Entry<float> _renderScale;
 
         internal static MelonPreferences_Entry<AnisotropicFiltering> anisotropicFiltering;
         internal static MelonPreferences_Entry<float> lodBias;
         internal static MelonPreferences_Entry<int> masterTextureLimit;
         internal static MelonPreferences_Entry<int> maximumLODLevel;
-        internal static MelonPreferences_Entry<int> maxQueuedFrames;
         internal static MelonPreferences_Entry<int> particleRaycastBudget;
         internal static MelonPreferences_Entry<int> pixelLightCount;
         internal static MelonPreferences_Entry<bool> realtimeReflectionProbes;
@@ -44,8 +49,7 @@ namespace UltraPotato.Modules
         internal static MelonPreferences_Entry<float> _reflectionProbeMultiplier;
         internal static MelonPreferences_Entry<int> _reflectionProbeMax;
         internal static MelonPreferences_Entry<bool> _simplerWater;
-        internal static MelonPreferences_Entry<ShadowQuality> shadows;
-        internal static MelonPreferences_Entry<ShadowResolution> shadowResolution;   
+        internal static MelonPreferences_Entry<ShadowResolution> shadowResolution;
         internal static MelonPreferences_Entry<int> shadowDistance;
         internal static MelonPreferences_Entry<int> shadowCascades;
         internal static MelonPreferences_Entry<SkinWeights> skinWeights;
@@ -61,13 +65,16 @@ namespace UltraPotato.Modules
         const string PRESET_DESC = """
             The preset to use. Enable advanced settings to finetune controls.
 
-            Minimum: As low as I could possibly make it without the game looking entirely unrecognizable.
-            Low: Loses more detail than Medium for slightly better performance, with a slightly lower memory budget.
             Medium: The default. Lowers on VRAM without really being all too noticable in motion.
             High: Matches how Neon White *normally* looks. Here to use as a base for customization.
             SnapshotReflects: High, but with reflections made at level load.
-            Maximum: Cranks up the display to as high as it would let me. No LODs, super high-quality realtime reflections.
             **ONLY USE THIS IF YOUR PC IS ABSURDLY BEEFY!!!!!**
+            Maximum: Cranks up the display to as high as it would let me. No LODs, super high-quality realtime reflections.
+    
+            **The following settings are not SRC verifiable:**
+            Minimum: As low as I could possibly make it without the game looking entirely unrecognizable.
+            Low: Loses more detail than Medium for slightly better performance.
+            
             """;
 
         static void Setup()
@@ -77,13 +84,15 @@ namespace UltraPotato.Modules
 
             _activePreset = Settings.Add(SuperPotato.Settings.h, "", "preset", "Preset", PRESET_DESC.Trim(), Presets.Medium);
             _activePreset.OnEntryValueChanged.Subscribe((_, after) => SetPreset(after));
+            _renderScale = Settings.Add(SuperPotato.Settings.h, "", "_renderScale", "Render Scale", "This setting lowers *only* the render quality of the player's camera.\n(This can be lowered to 0.77 and still be SRC verifiable.)", 1f, new ValueRange<float>(0.5f, 2f));
 
-            //_renderScale = Settings.Add(UltraPotato.Settings.h, "", "_renderScale", "Render Scale", null, 1f, new ValueRange<float>(0.5f, 2f));
+            FSR.Module._Setup();
+            CompleteRenderer._Setup();
+
             anisotropicFiltering = Settings.Add(SuperPotato.Settings.h, "", "anisotropicFiltering", "Anisotropic Filtering", null, default(AnisotropicFiltering), true);
             lodBias = Settings.Add(SuperPotato.Settings.h, "", "lodBias", "LOD Bias", "The value to multiply for checking LOD distance.", default(float), true);
             masterTextureLimit = Settings.Add(SuperPotato.Settings.h, "", "masterTextureLimit", "Skip Mipmap", "How many mips to skip for textures.\nHigher values are lower quality.", default(int), true);
             maximumLODLevel = Settings.Add(SuperPotato.Settings.h, "", "maximumLODLevel", "Max LOD Level", "The maximum Level of Detail objects can have.\nLower values are lower quality.", default(int), true);
-            maxQueuedFrames = Settings.Add(SuperPotato.Settings.h, "", "maxQueuedFrames", "Max Queued Frames", "How many frames to queue to the GPU.", default(int), true);
             particleRaycastBudget = Settings.Add(SuperPotato.Settings.h, "", "particleRaycastBudget", "Particle Raycast Budget", "How many times particles can raycast per frame.", default(int), true);
             pixelLightCount = Settings.Add(SuperPotato.Settings.h, "", "pixelLightCount", "Pixel Light Count", "How many pixel lights are allowed.\nUsed in the title, Heaven's Edge, TTT, and maybe other spots.", default(int), true);
             realtimeReflectionProbes = Settings.Add(SuperPotato.Settings.h, "", "realtimeReflectionProbes", "Advanced Reflection Probes", "Enabling this allows the reflections to reflect from runtime instead of using the baked textures.", default(bool), false);
@@ -91,8 +100,11 @@ namespace UltraPotato.Modules
             _reflectionProbeMultiplier = Settings.Add(SuperPotato.Settings.h, "", "_reflectionProbeMultiplier", "Reflection Probe Multiplier", "When advanced reflection probes are on, how much to multiply each probe's resolution by.", default(float), false);
             _reflectionProbeMax = Settings.Add(SuperPotato.Settings.h, "", "_reflectionProbeMax", "Reflection Probe Max", "The maxiumum advanced reflection probe resolution.", default(int), false);
             _reflectionUpdate = Settings.Add(SuperPotato.Settings.h, "", "_reflectionUpdate", "Reflection Time Slicing", "AllFacesAtOnce: update every 9 frames\nIndividualFaces: update each face of the reflection individually (14 frames)\nNoTimeSlicing: update *every* frame", default(ReflectionProbeTimeSlicingMode), false);
+            RealtimeReflects._Setup();
+
             _simplerWater = Settings.Add(SuperPotato.Settings.h, "", "_simplerWater", "Simpler Water", "Makes the water only reflect the skybox.", default(bool), true);
-            shadows = Settings.Add(SuperPotato.Settings.h, "", "shadows", "Shadows", "Only affects (some) realtime shadows.", default(ShadowQuality), true);
+            SimplerWater._Setup();
+
             shadowResolution = Settings.Add(SuperPotato.Settings.h, "", "shadowResolution", "Shadow Resolution", "Higher means sharper.", default(ShadowResolution), true);
             shadowDistance = Settings.Add(SuperPotato.Settings.h, "", "shadowDistance", "Shadow Distance", "The drawing distance for shadows.", default(int), true);
             shadowCascades = Settings.Add(SuperPotato.Settings.h, "", "shadowCascades", "Shadow Cascades", "How many \"cascades\" or splits to use for shadow quality.", default(int), true);
@@ -103,6 +115,7 @@ namespace UltraPotato.Modules
             streamingMipmapsMaxLevelReduction = Settings.Add(SuperPotato.Settings.h, "", "streamingMipmapsMaxLevelReduction", "Minimum Mipmap", "When streaming mips is active, keep this as the minimum.", default(int), true);
             streamingMipmapsMemoryBudget = Settings.Add(SuperPotato.Settings.h, "", "streamingMipmapsMemoryBudget", "Mipmap Memory Budget", "Lower means less VRAM used, and lower quality textures.", default(float), true);
             _amplifyOcclusion = Settings.Add(SuperPotato.Settings.h, "", "_amplifyOcclusion", "Amplify Occlusion", "Whether or not to enable the additional AO effect from Amplify Occlusion.", default(bool), true);
+            DisableAmplify._Setup();
 
             // populate settings
             foreach (var entry in typeof(QualityControl).GetRuntimeFields()
@@ -119,6 +132,7 @@ namespace UltraPotato.Modules
         }
 
 
+        static readonly Type msvoPass = typeof(NW_MSV_AO_RendererFeature).GetNestedType("MultiScaleVOPass", AccessTools.all);
         static void Activate(bool activate)
         {
             // fuck you chuli from the past
@@ -128,6 +142,10 @@ namespace UltraPotato.Modules
             Patching.TogglePatch(activate, typeof(LeaderboardScore), "SetScore", RegenPFPNoMipsLBS, Patching.PatchTarget.Prefix);
             Patching.TogglePatch(activate, typeof(GameDataManager), "ApplyShadowPrefs", SetQualityValues, Patching.PatchTarget.Postfix);
 
+            Patching.TogglePatch(activate, typeof(PlayerCamera), "Start", SetPlayerCamera, Patching.PatchTarget.Prefix);
+
+            Patching.TogglePatch(activate, msvoPass, "Execute", RevertThickness, Patching.PatchTarget.Postfix);
+
             active = activate;
 
             SetQuality();
@@ -136,6 +154,41 @@ namespace UltraPotato.Modules
             else
                 SetQualityValues();
         }
+
+        static void RevertThickness(ref UnityEngine.Rendering.Universal.RenderingData renderingData, NW_MSVAO_Settings ___m_Settings)
+        {
+            if (renderingData.cameraData.camera == playerCam)
+                ___m_Settings.Intensity.value /= (float)Math.Sqrt(_renderScale.Value);
+        }
+
+        static void SetPlayerCamera(PlayerCamera __instance)
+        {
+            if (__instance.gameObject.scene.name != "Player")
+                return;
+            playerCam = __instance.cam;
+            SetupPlayerCamera();
+        }
+
+        internal static void SetupPlayerCamera()
+        {
+            if (!playerCam)
+                return;
+
+            CompleteRenderer.SetupCamera();
+            if (CompleteRenderer.active)
+            {
+                var camdata = playerCam.GetComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>();
+                if (FSR.Module.active)
+                {
+                    camdata.antialiasing = UnityEngine.Rendering.Universal.AntialiasingMode.None;
+                    playerCam.allowMSAA = true;
+                }
+
+                CompleteRenderer.SetPlayerCamTex(CompleteRenderer.cameraScene);
+                CompleteRenderer.camStack.SetValue(camdata, null);
+            }
+        }
+
 
         static void RegenPFPNoMips(ref Texture2D profilePicture)
         {
@@ -158,8 +211,9 @@ namespace UltraPotato.Modules
         }
 
         static readonly FieldInfo shadowRes = Helpers.Field(typeof(URPA), "m_MainLightShadowmapResolution");
+        static readonly FieldInfo renderDatas = Helpers.Field(typeof(URPA), "m_RendererDataList");
 
-        static URPA currentAsset;
+        internal static URPA currentAsset;
 
         internal static void SetQualityValues()
         {
@@ -172,7 +226,8 @@ namespace UltraPotato.Modules
                     continue;
 
                 var field = Helpers.Field(typeof(QualitySettings), e.Identifier);
-                if (field != null) { 
+                if (field != null)
+                {
                     field.SetValue(null, e.BoxedValue);
                 }
                 else
@@ -189,18 +244,86 @@ namespace UltraPotato.Modules
             currentAsset.shadowCascadeCount = shadowCascades.Value;
             currentAsset.shadowDistance = shadowDistance.Value;
             currentAsset.maxAdditionalLightsCount = pixelLightCount.Value;
+
+            if (FSR.Module.active && i)
+                i.StartCoroutine(FSR.Module.AddFeatureWait(Singleton<Game>.Instance.GetCurrentLevel()));
+
+            var datas = (SRD[])renderDatas.GetValue(currentAsset);
+            CompleteRenderer.rendererIndex = datas.Length;
+            for (int i = 0; i < datas.Length; ++i)
+            {
+                if (!CompleteRenderer.rendererData)
+                    CompleteRenderer.TrySetupRendererData(datas[i]);
+
+                else if (datas[i] == CompleteRenderer.rendererData)
+                {
+                    CompleteRenderer.rendererIndex = i; break;
+                }
+            }
+
+            if (CompleteRenderer.rendererIndex == datas.Length)
+                renderDatas.SetValue(currentAsset, datas.AddItem(CompleteRenderer.rendererData).ToArray());
+
+            SetupPlayerCamera();
+
             QualitySettings.renderPipeline = currentAsset;
             shadowRes.SetValue(currentAsset, (int)Math.Pow(2, 9 + (int)shadowResolution.Value));
         }
 
         static bool settingPreset = false;
+        static bool dirty = true;
         static void SetToCustom()
         {
             if (settingPreset)
                 return;
             _activePreset.Value = Presets.Custom;
-            SetQualityValues();
+            dirty = true;
         }
+
+        void Awake() => i = this;
+        void Update()
+        {
+            if (dirty)
+                SetQualityValues();
+            dirty = false;
+        }
+
+        static readonly float CHECK_renderScale = .77f;
+        static readonly float CHECKlodBias = 1.5f;
+        static readonly int CHECKmasterTextureLimit = 1;
+        static readonly int CHECKmaximumLODLevel = 0;
+        static readonly int CHECKparticleRaycastBudget = 4096;
+        static readonly int CHECKpixelLightCount = 2;
+        static readonly int CHECKshadowCascades = 4;
+        static readonly ShadowResolution CHECKshadowResolution = ShadowResolution.High;
+        static readonly int CHECKshadowDistance = 300;
+        static readonly SkinWeights CHECKskinWeights = SkinWeights.TwoBones;
+        static readonly bool CHECKsoftParticles = false;
+        static readonly int CHECKstreamingMipmapsMaxLevelReduction = 1;
+        static readonly int CHECKstreamingMipmapsMemoryBudget = 1024;
+        static readonly bool CHECK_simplerWater = false;
+        static readonly bool CHECK_amplifyOcclusion = true;
+
+        static bool CheckVerifiable()
+        {
+            if (_renderScale.Value < CHECK_renderScale) return false;
+            if (lodBias.Value < CHECKlodBias) return false;
+            if (masterTextureLimit.Value > CHECKmasterTextureLimit) return false;
+            if (maximumLODLevel.Value != CHECKmaximumLODLevel) return false;
+            if (particleRaycastBudget.Value < CHECKparticleRaycastBudget) return false;
+            if (pixelLightCount.Value < CHECKpixelLightCount) return false;
+            if (shadowCascades.Value < CHECKshadowCascades) return false;
+            if (shadowResolution.Value < CHECKshadowResolution) return false;
+            if (shadowDistance.Value < CHECKshadowDistance) return false;
+            if (skinWeights.Value < CHECKskinWeights) return false;
+            if (softParticles.Value != CHECKsoftParticles) return false;
+            if (streamingMipmapsMaxLevelReduction.Value > CHECKstreamingMipmapsMaxLevelReduction) return false;
+            if (streamingMipmapsMemoryBudget.Value < CHECKstreamingMipmapsMemoryBudget) return false;
+            if (_simplerWater.Value != CHECK_simplerWater) return false;
+            if (_amplifyOcclusion.Value != CHECK_amplifyOcclusion) return false;
+            return true;
+        }
+
         static void SetPreset(Presets preset, bool set = true)
         {
             settingPreset = true;
@@ -213,86 +336,83 @@ namespace UltraPotato.Modules
                     _reflectionProbeMax.Value = 1024;
                     goto case Presets.High;
                 case Presets.High:
-                    //_renderScale.Value = 1f;
+                    _renderScale.Value = 1f;
+                    FSR.Module.preset.Value = false;
+
                     anisotropicFiltering.Value = AnisotropicFiltering.ForceEnable;
                     lodBias.Value = 2;
                     masterTextureLimit.Value = 0;
                     maximumLODLevel.Value = 0;
-                    maxQueuedFrames.Value = 2;
                     particleRaycastBudget.Value = 4096;
                     pixelLightCount.Value = 3;
                     realtimeReflectionProbes.Value = preset != Presets.High;
-                    shadows.Value = ShadowQuality.HardOnly;
                     shadowCascades.Value = 4;
                     shadowResolution.Value = ShadowResolution.VeryHigh;
                     shadowDistance.Value = 400;
                     skinWeights.Value = SkinWeights.FourBones;
                     softParticles.Value = true;
-                    //softVegetation.Value = true;
                     streamingMipmapsActive.Value = false;
                     _simplerWater.Value = false;
                     _amplifyOcclusion.Value = true;
 
                     break;
                 case Presets.Medium:
-                    //_renderScale.Value = 1f;
+                    _renderScale.Value = 0.85f;
+                    FSR.Module.preset.Value = true;
                     anisotropicFiltering.Value = AnisotropicFiltering.ForceEnable;
-                    lodBias.Value = 1.5f;
-                    masterTextureLimit.Value = 1;
-                    maximumLODLevel.Value = 0;
-                    maxQueuedFrames.Value = 2;
-                    particleRaycastBudget.Value = 4096;
-                    pixelLightCount.Value = 2;
+                    lodBias.Value = CHECKlodBias;
+                    masterTextureLimit.Value = CHECKmasterTextureLimit;
+                    maximumLODLevel.Value = CHECKmaximumLODLevel;
+                    particleRaycastBudget.Value = CHECKparticleRaycastBudget;
+                    pixelLightCount.Value = CHECKpixelLightCount;
                     realtimeReflectionProbes.Value = false;
-                    shadows.Value = ShadowQuality.HardOnly;
-                    shadowCascades.Value = 4;
-                    shadowResolution.Value = ShadowResolution.High;
-                    shadowDistance.Value = 200;
-                    skinWeights.Value = SkinWeights.TwoBones;
-                    softParticles.Value = false;
-                    //softVegetation.Value = true;
+                    shadowCascades.Value = CHECKshadowCascades;
+                    shadowResolution.Value = CHECKshadowResolution;
+                    shadowDistance.Value = CHECKshadowDistance;
+                    skinWeights.Value = CHECKskinWeights;
+                    softParticles.Value = CHECKsoftParticles;
                     streamingMipmapsActive.Value = true;
-                    streamingMipmapsMaxLevelReduction.Value = 1;
-                    streamingMipmapsMemoryBudget.Value = 1024;
-                    _simplerWater.Value = false;
-                    _amplifyOcclusion.Value = true;
+                    streamingMipmapsMaxLevelReduction.Value = CHECKstreamingMipmapsMaxLevelReduction;
+                    streamingMipmapsMemoryBudget.Value = CHECKstreamingMipmapsMemoryBudget;
+                    _simplerWater.Value = CHECK_simplerWater;
+                    _amplifyOcclusion.Value = CHECK_amplifyOcclusion;
+
 
                     break;
                 case Presets.Low:
-                    //_renderScale.Value = 1f;
+                    _renderScale.Value = 0.8f;
+                    FSR.Module.preset.Value = true;
+
                     anisotropicFiltering.Value = AnisotropicFiltering.ForceEnable;
                     lodBias.Value = 1;
                     masterTextureLimit.Value = 2;
                     maximumLODLevel.Value = 0;
-                    maxQueuedFrames.Value = 2;
                     particleRaycastBudget.Value = 2048;
                     pixelLightCount.Value = 0;
                     realtimeReflectionProbes.Value = false;
-                    shadows.Value = ShadowQuality.HardOnly;
                     shadowCascades.Value = 4;
                     shadowResolution.Value = ShadowResolution.Medium;
-                    shadowDistance.Value = 100;
+                    shadowDistance.Value = 250;
                     skinWeights.Value = SkinWeights.TwoBones;
                     softParticles.Value = false;
-                    //softVegetation.Value = false;
                     streamingMipmapsActive.Value = true;
                     streamingMipmapsMaxLevelReduction.Value = 3;
                     streamingMipmapsMemoryBudget.Value = 512;
-                    _simplerWater.Value = true;
+                    _simplerWater.Value = false;
                     _amplifyOcclusion.Value = true;
 
                     break;
                 case Presets.Minimum:
-                    //_renderScale.Value = 0.9f;
+                    _renderScale.Value = 0.77f;
+                    FSR.Module.preset.Value = true;
+
                     anisotropicFiltering.Value = AnisotropicFiltering.Disable;
                     lodBias.Value = 0.1f;
                     masterTextureLimit.Value = 3;
                     maximumLODLevel.Value = 0;
-                    maxQueuedFrames.Value = 2;
                     particleRaycastBudget.Value = 1024;
                     pixelLightCount.Value = 0;
                     realtimeReflectionProbes.Value = false;
-                    shadows.Value = ShadowQuality.Disable;
                     shadowCascades.Value = 1;
                     shadowDistance.Value = 0;
                     skinWeights.Value = SkinWeights.OneBone;
@@ -306,12 +426,13 @@ namespace UltraPotato.Modules
 
                     break;
                 case Presets.Maximum:
-                    //_renderScale.Value = 2f;
+                    _renderScale.Value = 1f;
+                    FSR.Module.preset.Value = false;
+
                     anisotropicFiltering.Value = AnisotropicFiltering.ForceEnable;
                     lodBias.Value = 100;
                     masterTextureLimit.Value = 0;
                     maximumLODLevel.Value = 0;
-                    maxQueuedFrames.Value = 2;
                     particleRaycastBudget.Value = 8192;
                     pixelLightCount.Value = 100;
                     realtimeReflectionProbes.Value = true;
@@ -319,7 +440,6 @@ namespace UltraPotato.Modules
                     _reflectionProbeMultiplier.Value = 32;
                     _reflectionProbeMax.Value = 2048;
                     _reflectionUpdate.Value = ReflectionProbeTimeSlicingMode.NoTimeSlicing;
-                    shadows.Value = ShadowQuality.HardOnly;
                     shadowCascades.Value = 4;
                     shadowResolution.Value = ShadowResolution.VeryHigh;
                     shadowDistance.Value = 600;

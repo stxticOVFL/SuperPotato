@@ -8,6 +8,7 @@
 - Easy drop in VRAM (~500mb) without much quality loss
 - Difficult to notice in-motion (on Medium preset)
 - Additional ability to crank GFX even higher than normal
+- Includes an implementation of [AMD's FSR 1](https://gpuopen.com/fidelityfx-superresolution) licensed under the [MIT license](https://opensource.org/license/mit)!
 
 ### Preset Comparison
 
@@ -15,7 +16,7 @@ Click on the image to see it in higher quality!
 
 <img height="500" src="https://github.com/user-attachments/assets/58a4ba7d-3a5f-4857-aa26-6e395f083015" />
 
-(minimum, low, medium, and high)
+(minimum, low, medium, and high, as of v1.1.0)
 
 ## Installation
 1. Download [MelonLoader](https://github.com/LavaGang/MelonLoader/releases/latest) and install v0.6.1 onto your `Neon White.exe`.
