@@ -11,7 +11,7 @@
 - Includes an implementation of [AMD's FSR 1](https://gpuopen.com/fidelityfx-superresolution) licensed under the [MIT license](https://opensource.org/license/mit)!
 
 ### Preset Comparison
-
+## Any settings below the Medium preset are not SRC verifiable.
 Click on the image to see it in higher quality!
 
 <img height="500" src="https://github.com/user-attachments/assets/58a4ba7d-3a5f-4857-aa26-6e395f083015" />
