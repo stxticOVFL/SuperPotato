@@ -70,11 +70,11 @@ namespace UltraPotato.Modules
             SnapshotReflects: High, but with reflections made at level load.
             **ONLY USE THIS IF YOUR PC IS ABSURDLY BEEFY!!!!!**
             Maximum: Cranks up the display to as high as it would let me. No LODs, super high-quality realtime reflections.
-    
+
             **The following settings are not SRC verifiable:**
             Minimum: As low as I could possibly make it without the game looking entirely unrecognizable.
             Low: Loses more detail than Medium for slightly better performance.
-            
+
             """;
 
         static void Setup()
@@ -278,6 +278,10 @@ namespace UltraPotato.Modules
                 return;
             _activePreset.Value = Presets.Custom;
             dirty = true;
+
+            var check = CheckVerifiable();
+            if (check != null)
+                Verifier.SetRunUnverifiable(SuperPotato.instance.MelonAssembly, CHECK_failmsg);
         }
 
         void Awake() => i = this;
@@ -288,40 +292,41 @@ namespace UltraPotato.Modules
             dirty = false;
         }
 
-        static readonly float CHECK_renderScale = .77f;
-        static readonly float CHECKlodBias = 1.5f;
-        static readonly int CHECKmasterTextureLimit = 1;
-        static readonly int CHECKmaximumLODLevel = 0;
-        static readonly int CHECKparticleRaycastBudget = 4096;
-        static readonly int CHECKpixelLightCount = 2;
-        static readonly int CHECKshadowCascades = 4;
-        static readonly ShadowResolution CHECKshadowResolution = ShadowResolution.High;
-        static readonly int CHECKshadowDistance = 300;
-        static readonly SkinWeights CHECKskinWeights = SkinWeights.TwoBones;
-        static readonly bool CHECKsoftParticles = false;
-        static readonly int CHECKstreamingMipmapsMaxLevelReduction = 1;
-        static readonly int CHECKstreamingMipmapsMemoryBudget = 1024;
-        static readonly bool CHECK_simplerWater = false;
-        static readonly bool CHECK_amplifyOcclusion = true;
+        const float CHECK_renderScale = .77f;
+        const float CHECKlodBias = 1.5f;
+        const int CHECKmasterTextureLimit = 1;
+        const int CHECKmaximumLODLevel = 0;
+        const int CHECKparticleRaycastBudget = 4096;
+        const int CHECKpixelLightCount = 2;
+        const int CHECKshadowCascades = 4;
+        const ShadowResolution CHECKshadowResolution = ShadowResolution.High;
+        const int CHECKshadowDistance = 300;
+        const SkinWeights CHECKskinWeights = SkinWeights.TwoBones;
+        const bool CHECKsoftParticles = false;
+        const int CHECKstreamingMipmapsMaxLevelReduction = 1;
+        const int CHECKstreamingMipmapsMemoryBudget = 1024;
+        const bool CHECK_simplerWater = false;
+        const bool CHECK_amplifyOcclusion = true;
+        const string CHECK_failmsg = "One or more settings are below the Medium preset";
 
-        static bool CheckVerifiable()
+        static string CheckVerifiable()
         {
-            if (_renderScale.Value < CHECK_renderScale) return false;
-            if (lodBias.Value < CHECKlodBias) return false;
-            if (masterTextureLimit.Value > CHECKmasterTextureLimit) return false;
-            if (maximumLODLevel.Value != CHECKmaximumLODLevel) return false;
-            if (particleRaycastBudget.Value < CHECKparticleRaycastBudget) return false;
-            if (pixelLightCount.Value < CHECKpixelLightCount) return false;
-            if (shadowCascades.Value < CHECKshadowCascades) return false;
-            if (shadowResolution.Value < CHECKshadowResolution) return false;
-            if (shadowDistance.Value < CHECKshadowDistance) return false;
-            if (skinWeights.Value < CHECKskinWeights) return false;
-            if (softParticles.Value != CHECKsoftParticles) return false;
-            if (streamingMipmapsMaxLevelReduction.Value > CHECKstreamingMipmapsMaxLevelReduction) return false;
-            if (streamingMipmapsMemoryBudget.Value < CHECKstreamingMipmapsMemoryBudget) return false;
-            if (_simplerWater.Value != CHECK_simplerWater) return false;
-            if (_amplifyOcclusion.Value != CHECK_amplifyOcclusion) return false;
-            return true;
+            if (_renderScale.Value < CHECK_renderScale) return "Render scale is too low";
+            if (lodBias.Value < CHECKlodBias) return CHECK_failmsg;
+            if (masterTextureLimit.Value > CHECKmasterTextureLimit) return CHECK_failmsg;
+            if (maximumLODLevel.Value != CHECKmaximumLODLevel) return CHECK_failmsg;
+            if (particleRaycastBudget.Value < CHECKparticleRaycastBudget) return CHECK_failmsg;
+            if (pixelLightCount.Value < CHECKpixelLightCount) return CHECK_failmsg;
+            if (shadowCascades.Value < CHECKshadowCascades) return CHECK_failmsg;
+            if (shadowResolution.Value < CHECKshadowResolution) return CHECK_failmsg;
+            if (shadowDistance.Value < CHECKshadowDistance) return CHECK_failmsg;
+            if (skinWeights.Value < CHECKskinWeights) return CHECK_failmsg;
+            if (softParticles.Value != CHECKsoftParticles) return CHECK_failmsg;
+            if (streamingMipmapsMaxLevelReduction.Value > CHECKstreamingMipmapsMaxLevelReduction) return CHECK_failmsg;
+            if (streamingMipmapsMemoryBudget.Value < CHECKstreamingMipmapsMemoryBudget) return CHECK_failmsg;
+            if (_simplerWater.Value != CHECK_simplerWater) return CHECK_failmsg;
+            if (_amplifyOcclusion.Value != CHECK_amplifyOcclusion) return CHECK_failmsg;
+            return null;
         }
 
         static void SetPreset(Presets preset, bool set = true)
@@ -452,6 +457,9 @@ namespace UltraPotato.Modules
 
                     break;
             }
+
+            if (preset < Presets.Medium)
+                Verifier.SetRunUnverifiable(SuperPotato.instance.MelonAssembly, CHECK_failmsg);
 
             if (set)
                 SetQualityValues();
