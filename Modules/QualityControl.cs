@@ -302,30 +302,39 @@ namespace UltraPotato.Modules
         const ShadowResolution CHECKshadowResolution = ShadowResolution.High;
         const int CHECKshadowDistance = 300;
         const SkinWeights CHECKskinWeights = SkinWeights.TwoBones;
-        const bool CHECKsoftParticles = false;
         const int CHECKstreamingMipmapsMaxLevelReduction = 1;
         const int CHECKstreamingMipmapsMemoryBudget = 1024;
         const bool CHECK_simplerWater = false;
         const bool CHECK_amplifyOcclusion = true;
-        const string CHECK_failmsg = "One or more settings are below the Medium preset";
+        const string CHECK_failmsg = "One or more settings are below the Medium preset ({0})";
 
         static string CheckVerifiable()
         {
+            if (!active) return null;
             if (_renderScale.Value < CHECK_renderScale) return "Render scale is too low";
-            if (lodBias.Value < CHECKlodBias) return CHECK_failmsg;
-            if (masterTextureLimit.Value > CHECKmasterTextureLimit) return CHECK_failmsg;
-            if (maximumLODLevel.Value != CHECKmaximumLODLevel) return CHECK_failmsg;
-            if (particleRaycastBudget.Value < CHECKparticleRaycastBudget) return CHECK_failmsg;
-            if (pixelLightCount.Value < CHECKpixelLightCount) return CHECK_failmsg;
-            if (shadowCascades.Value < CHECKshadowCascades) return CHECK_failmsg;
-            if (shadowResolution.Value < CHECKshadowResolution) return CHECK_failmsg;
-            if (shadowDistance.Value < CHECKshadowDistance) return CHECK_failmsg;
-            if (skinWeights.Value < CHECKskinWeights) return CHECK_failmsg;
-            if (softParticles.Value != CHECKsoftParticles) return CHECK_failmsg;
-            if (streamingMipmapsMaxLevelReduction.Value > CHECKstreamingMipmapsMaxLevelReduction) return CHECK_failmsg;
-            if (streamingMipmapsMemoryBudget.Value < CHECKstreamingMipmapsMemoryBudget) return CHECK_failmsg;
-            if (_simplerWater.Value != CHECK_simplerWater) return CHECK_failmsg;
-            if (_amplifyOcclusion.Value != CHECK_amplifyOcclusion) return CHECK_failmsg;
+
+            MelonPreferences_Entry failVal = null;
+
+            if (lodBias.Value < CHECKlodBias) failVal = lodBias;
+            if (masterTextureLimit.Value > CHECKmasterTextureLimit) failVal = masterTextureLimit;
+            if (maximumLODLevel.Value != CHECKmaximumLODLevel) failVal = maximumLODLevel;
+            if (particleRaycastBudget.Value < CHECKparticleRaycastBudget) failVal = particleRaycastBudget;
+            if (pixelLightCount.Value < CHECKpixelLightCount) failVal = pixelLightCount;
+            if (shadowCascades.Value < CHECKshadowCascades) failVal = shadowCascades;
+            if (shadowResolution.Value < CHECKshadowResolution) failVal = shadowResolution;
+            if (shadowDistance.Value < CHECKshadowDistance) failVal = shadowDistance;
+            if (skinWeights.Value < CHECKskinWeights) failVal = skinWeights;
+            if (streamingMipmapsActive.Value)
+            {
+                if (streamingMipmapsMaxLevelReduction.Value > CHECKstreamingMipmapsMaxLevelReduction) failVal = streamingMipmapsMaxLevelReduction;
+                if (streamingMipmapsMemoryBudget.Value < CHECKstreamingMipmapsMemoryBudget) failVal = streamingMipmapsMemoryBudget;
+            }
+            if (_simplerWater.Value != CHECK_simplerWater) failVal = _simplerWater;
+            if (_amplifyOcclusion.Value != CHECK_amplifyOcclusion) failVal = _amplifyOcclusion;
+
+            if (failVal != null)
+                return string.Format(CHECK_failmsg, failVal.DisplayName);
+
             return null;
         }
 
@@ -375,7 +384,7 @@ namespace UltraPotato.Modules
                     shadowResolution.Value = CHECKshadowResolution;
                     shadowDistance.Value = CHECKshadowDistance;
                     skinWeights.Value = CHECKskinWeights;
-                    softParticles.Value = CHECKsoftParticles;
+                    softParticles.Value = false;
                     streamingMipmapsActive.Value = true;
                     streamingMipmapsMaxLevelReduction.Value = CHECKstreamingMipmapsMaxLevelReduction;
                     streamingMipmapsMemoryBudget.Value = CHECKstreamingMipmapsMemoryBudget;
