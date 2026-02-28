@@ -23,7 +23,7 @@ namespace UltraPotato.Modules.FSR
 
     internal class Module : IModule
     {
-        const bool priority = true;
+        const bool priority = false;
         internal static bool active = true;
 
         internal static MelonPreferences_Entry<bool> preset;
@@ -176,7 +176,7 @@ namespace UltraPotato.Modules.FSR
             }
 
             protected override void Dispose(bool disposing)
-            {                    
+            {
                 pass?.easuCB?.Release();
                 pass?.rcasCB?.Release();
                 pass = null;
