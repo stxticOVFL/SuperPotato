@@ -30,7 +30,6 @@ namespace UltraPotato
             NeonLite.Modules.Anticheat.Register(MelonAssembly);
 #endif
             NeonLite.NeonLite.LoadModules(MelonAssembly);
-
         }
 
         public override void OnLateInitializeMelon()
@@ -44,7 +43,7 @@ namespace UltraPotato
             CompleteRenderer.camera = holder.GetComponent<Camera>();
             CompleteRenderer.SetupRenderTextures();
 
-            Singleton<Game>.Instance.OnInitializationComplete += CheckCamera;  
+            Singleton<Game>.Instance.OnInitializationComplete += CheckCamera;
         }
 
         private void CheckCamera() => CompleteRenderer.camera.enabled = false;

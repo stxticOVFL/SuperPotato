@@ -148,7 +148,10 @@ namespace UltraPotato.Modules
 
             active = activate;
 
-            SetQuality();
+            // reset the quality level back; we don't use this anymore as of 1.2.3 as it causes issues
+            if (QualitySettings.GetQualityLevel() != 0)
+                QualitySettings.SetQualityLevel(0, true);
+
             if (!activate)
                 GameDataManager.ApplyShadowPrefs();
             else
@@ -201,14 +204,6 @@ namespace UltraPotato.Modules
         }
 
         static void RegenPFPNoMipsLBS(ref ScoreData newData) => RegenPFPNoMips(ref newData._profilePicture);
-
-        internal static void SetQuality(bool? set = null)
-        {
-            if (!set.HasValue)
-                set = active;
-
-            QualitySettings.SetQualityLevel(set.Value ? 1 : 0, true);
-        }
 
         static readonly FieldInfo shadowRes = Helpers.Field(typeof(URPA), "m_MainLightShadowmapResolution");
         static readonly FieldInfo renderDatas = Helpers.Field(typeof(URPA), "m_RendererDataList");
@@ -468,7 +463,7 @@ namespace UltraPotato.Modules
             }
 
             if (preset < Presets.Medium)
-                Verifier.SetRunUnverifiable(SuperPotato.instance.MelonAssembly, CHECK_failmsg);
+                Verifier.SetRunUnverifiable(SuperPotato.instance.MelonAssembly, string.Format(CHECK_failmsg, "preset set to below Medium"));
 
             if (set)
                 SetQualityValues();
